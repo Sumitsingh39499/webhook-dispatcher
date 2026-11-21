@@ -1,0 +1,78 @@
+{
+  "info": {
+    "name": "Distributed Webhook Dispatcher",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:3000" },
+    { "key": "jobId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": { "method": "GET", "url": "{{baseUrl}}/health" }
+    },
+    {
+      "name": "Dispatch 200",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/webhooks/dispatch",
+        "body": { "mode": "raw", "raw": "{\n  \"destinationUrl\": \"{{baseUrl}}/mock/200\",\n  \"eventId\": \"postman-200\",\n  \"payload\": {\"test\": true}\n}" }
+      }
+    },
+    {
+      "name": "Dispatch 429",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/webhooks/dispatch",
+        "body": { "mode": "raw", "raw": "{\n  \"destinationUrl\": \"{{baseUrl}}/mock/429\",\n  \"eventId\": \"postman-429\",\n  \"payload\": {}\n}" }
+      }
+    },
+    {
+      "name": "Dispatch 500",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/webhooks/dispatch",
+        "body": { "mode": "raw", "raw": "{\n  \"destinationUrl\": \"{{baseUrl}}/mock/500\",\n  \"eventId\": \"postman-500\",\n  \"payload\": {}\n}" }
+      }
+    },
+    {
+      "name": "Dispatch delayed timeout",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/webhooks/dispatch",
+        "body": { "mode": "raw", "raw": "{\n  \"destinationUrl\": \"{{baseUrl}}/mock/delayed\",\n  \"eventId\": \"postman-delayed\",\n  \"payload\": {}\n}" }
+      }
+    },
+    {
+      "name": "Dispatch 404 non-retryable",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/webhooks/dispatch",
+        "body": { "mode": "raw", "raw": "{\n  \"destinationUrl\": \"{{baseUrl}}/mock/404\",\n  \"eventId\": \"postman-404\",\n  \"payload\": {}\n}" }
+      }
+    },
+    {
+      "name": "Dispatch invalid body",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/webhooks/dispatch",
+        "body": { "mode": "raw", "raw": "{\"destinationUrl\":\"not-a-url\",\"eventId\":\"\",\"payload\":null}" }
+      }
+    },
+    {
+      "name": "Get job status",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/webhooks/{{jobId}}" }
+    },
+    {
+      "name": "Get unknown job",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/webhooks/not-a-real-job" }
+    }
+  ]
+}

@@ -7,7 +7,7 @@ import { recordDeliveryAttempt, type DeliveryStatus } from "../db/delivery-logs"
 import { createRedisConnection } from "../redis/connection";
 import { QUEUE_NAMES, getDlqQueue } from "../queue/queues";
 
-const HTTP_TIMEOUT_MS = 5_000;
+export const HTTP_TIMEOUT_MS = 5_000;
 const RATE_LIMIT_MAX_DELAY_MS = 30_000; // safety cap; bucket refills 1/s so ~<=1s normally
 
 /** Standard BullMQ job data for a webhook delivery. */
@@ -19,7 +19,7 @@ export interface WebhookJobData {
   httpAttempt?: number;
 }
 
-function statusFromResponse(code: number | null, err: AxiosError | null): {
+export function statusFromResponse(code: number | null, err: AxiosError | null): {
   retryable: boolean;
   failed: boolean; // true => DLQ now (non-retryable)
 } {

@@ -25,8 +25,8 @@ export function getDeliveryQueue(): Queue {
     deliveryQueue = new Queue(QUEUE_NAMES.delivery, {
       connection: createRedisConnection(),
       defaultJobOptions: {
-        attempts: 4,
-        backoff: { type: "exponential", delay: 2000 },
+        attempts: DELIVERY_QUEUE_ATTEMPTS,
+        backoff: { type: "exponential", delay: DELIVERY_QUEUE_BACKOFF_DELAY_MS },
         removeOnComplete: 500,
         removeOnFail: 500,
       },
@@ -55,3 +55,6 @@ export async function closeQueues(): Promise<void> {
     dlqQueue = null;
   }
 }
+
+export const DELIVERY_QUEUE_ATTEMPTS = 4;
+export const DELIVERY_QUEUE_BACKOFF_DELAY_MS = 2000;

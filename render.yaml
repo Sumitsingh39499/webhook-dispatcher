@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: webhook-dispatcher
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: PG_CONNECTION_STRING
+        sync: false
+      - key: REDIS_URL
+        sync: false

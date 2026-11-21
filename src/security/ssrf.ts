@@ -120,3 +120,8 @@ export function destinationHostname(rawUrl: string): string {
   const parsed = new URL(rawUrl);
   return parsed.hostname.toLowerCase().replace(/\.$/, "");
 }
+
+/** Test basic SSRF policy through an exported range helper. */
+export function isProhibitedDestinationIp(address: string): boolean {
+  return isProhibitedIp(address);
+}
