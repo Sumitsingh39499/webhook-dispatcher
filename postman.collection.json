@@ -4,7 +4,7 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://127.0.0.1:3000" },
+    { "key": "baseUrl", "value": "https://webhook-dispatcher-ip95.onrender.com" },
     { "key": "jobId", "value": "" }
   ],
   "item": [
@@ -18,7 +18,7 @@
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": "{{baseUrl}}/api/webhooks/dispatch",
-        "body": { "mode": "raw", "raw": "{\n  \"destinationUrl\": \"{{baseUrl}}/mock/200\",\n  \"eventId\": \"postman-200\",\n  \"payload\": {\"test\": true}\n}" }
+        "body": { "mode": "raw", "raw": "{\n  \"destinationUrl\": \"https://httpbin.org/status/200\",\n  \"eventId\": \"postman-200\",\n  \"payload\": {\"test\": true}\n}" }
       }
     },
     {
@@ -27,7 +27,7 @@
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": "{{baseUrl}}/api/webhooks/dispatch",
-        "body": { "mode": "raw", "raw": "{\n  \"destinationUrl\": \"{{baseUrl}}/mock/429\",\n  \"eventId\": \"postman-429\",\n  \"payload\": {}\n}" }
+        "body": { "mode": "raw", "raw": "{\n  \"destinationUrl\": \"https://httpbin.org/status/429\",\n  \"eventId\": \"postman-429\",\n  \"payload\": {}\n}" }
       }
     },
     {
@@ -36,7 +36,7 @@
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": "{{baseUrl}}/api/webhooks/dispatch",
-        "body": { "mode": "raw", "raw": "{\n  \"destinationUrl\": \"{{baseUrl}}/mock/500\",\n  \"eventId\": \"postman-500\",\n  \"payload\": {}\n}" }
+        "body": { "mode": "raw", "raw": "{\n  \"destinationUrl\": \"https://httpbin.org/status/500\",\n  \"eventId\": \"postman-500\",\n  \"payload\": {}\n}" }
       }
     },
     {
@@ -45,7 +45,7 @@
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": "{{baseUrl}}/api/webhooks/dispatch",
-        "body": { "mode": "raw", "raw": "{\n  \"destinationUrl\": \"{{baseUrl}}/mock/delayed\",\n  \"eventId\": \"postman-delayed\",\n  \"payload\": {}\n}" }
+        "body": { "mode": "raw", "raw": "{\n  \"destinationUrl\": \"https://httpbin.org/delay/10\",\n  \"eventId\": \"postman-delayed\",\n  \"payload\": {}\n}" }
       }
     },
     {
@@ -54,7 +54,7 @@
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": "{{baseUrl}}/api/webhooks/dispatch",
-        "body": { "mode": "raw", "raw": "{\n  \"destinationUrl\": \"{{baseUrl}}/mock/404\",\n  \"eventId\": \"postman-404\",\n  \"payload\": {}\n}" }
+        "body": { "mode": "raw", "raw": "{\n  \"destinationUrl\": \"https://httpbin.org/status/404\",\n  \"eventId\": \"postman-404\",\n  \"payload\": {}\n}" }
       }
     },
     {

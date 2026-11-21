@@ -3,6 +3,18 @@
 ## 1. Overview
 Node.js and TypeScript webhook ingestion and delivery engine using Express, BullMQ, Redis, and PostgreSQL.
 
+## Live Deployment
+- **Base URL:** `[https://webhook-dispatcher-ip95.onrender.com](https://webhook-dispatcher-ip95.onrender.com)`
+- **Health Check:** `GET [https://webhook-dispatcher-ip95.onrender.com/health](https://webhook-dispatcher-ip95.onrender.com/health)`
+
+> **Note:** Hosted on Render's free tier; the first request after inactivity may take ~50 seconds to wake up. Mock receiver routes (`/mock/*`) are intentionally disabled in production (`NODE_ENV=production`)—use external endpoints such as `[https://httpbin.org/status/200](https://httpbin.org/status/200)` (or `/500`, `/404`) when testing against the live URL.
+
+**Quick Live Test:**
+```bash
+curl -X POST https://webhook-dispatcher-ip95.onrender.com/api/webhooks/dispatch \
+  -H "Content-Type: application/json" \
+  -d '{"destinationUrl":"https://httpbin.org/status/200","eventId":"live-test-1","payload":{"msg":"hello"}}'
+
 ## 2. Architecture
 The API validates and enqueues work, a BullMQ worker performs outbound HTTP delivery, PostgreSQL stores attempt history, and permanently failed jobs are copied to a separate DLQ.
 
