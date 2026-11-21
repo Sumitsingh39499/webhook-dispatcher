@@ -4,10 +4,13 @@
 Node.js and TypeScript webhook ingestion and delivery engine using Express, BullMQ, Redis, and PostgreSQL.
 
 ## Live Deployment
-- **Base URL:** https://webhook-dispatcher-ip95.onrender.com
+- **Base URL / Interactive Test Dashboard:** https://webhook-dispatcher-ip95.onrender.com
 - **Health Check:** `GET` https://webhook-dispatcher-ip95.onrender.com/health
 
 > **Note:** Hosted on Render's free tier; the first request after inactivity may take ~50 seconds to wake up. Mock receiver routes (`/mock/*`) are intentionally disabled in production (`NODE_ENV=production`)—use external endpoints such as `https://httpbin.org/status/200` (or `/500`, `/404`) when testing against the live URL.
+
+**Interactive Test Dashboard (Optional):**  
+A lightweight, zero-dependency HTML/JS test console is served at `GET /` (`public/index.html`) for quick manual verification. It includes a `/health` status badge, 1-click preset triggers (`200 OK`, `500`/`429` retries, `404` fail-fast, `10s` timeout, `8x` burst), and a live-polling job inspector (`GET /api/webhooks/:jobId`). All queuing, rate limiting, retries, and logging remain strictly in the backend—the API operates identically without the UI.
 
 **Quick Live Test:**
 ```bash
