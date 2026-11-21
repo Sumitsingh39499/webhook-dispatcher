@@ -1,13 +1,11 @@
 import axios, { AxiosError } from "axios";
-import { AssertionError } from "node:assert";
-import { Queue, Worker, type Job } from "bullmq";
+import { Worker, type Job } from "bullmq";
 import { DelayedError, UnrecoverableError } from "bullmq";
-import { env } from "../config/env";
 import { destinationHostname } from "../security/ssrf";
 import { TokenBucket } from "../rate-limit/token-bucket";
 import { recordDeliveryAttempt, type DeliveryStatus } from "../db/delivery-logs";
 import { createRedisConnection } from "../redis/connection";
-import { QUEUE_NAMES } from "../queue/queues";
+import { QUEUE_NAMES, getDlqQueue } from "../queue/queues";
 
 const HTTP_TIMEOUT_MS = 5_000;
 const RATE_LIMIT_MAX_DELAY_MS = 30_000; // safety cap; bucket refills 1/s so ~<=1s normally
@@ -19,14 +17,6 @@ export interface WebhookJobData {
   payload: Record<string, unknown>;
   /** Number of actual outbound HTTP attempts made so far (not BullMQ ats). */
   httpAttempt?: number;
-}
-
-interface DeliveryRuntime {
-  httpAttempt: number;
-}
-
-function isUnrecoverable(err: unknown): boolean {
-  return err instanceof UnrecoverableError;
 }
 
 function statusFromResponse(code: number | null, err: AxiosError | null): {
@@ -101,6 +91,34 @@ export class DeliveryWorker {
       console.error("[worker] error:", err.message);
     });
 
+    // Transfer UnrecoverableError jobs to DLQ exactly once.
+    this.worker.on("failed", async (job, err) => {
+      if (!job || !(err instanceof UnrecoverableError)) {
+        return;
+      }
+
+      const data = job.data;
+      const failedReason = err.message || job.failedReason || "unknown";
+      await getDlqQueue().add(
+        "webhook-dead",
+        {
+          originalJobId: job.id,
+          destinationUrl: data.destinationUrl,
+          eventId: data.eventId,
+          payload: data.payload,
+          attemptsMade: job.attemptsMade,
+          maxAttempts: job.opts.attempts,
+          failedReason,
+          failedAt: new Date().toISOString(),
+          originalName: job.name,
+        },
+        { jobId: job.id as string }
+      );
+      console.warn(
+        `[dlq] status=dlq job=${job.id} eventId=${data.eventId} moved to DLQ: ${failedReason}`
+      );
+    });
+
     console.log("[worker] delivery worker started");
   }
 
@@ -111,9 +129,6 @@ export class DeliveryWorker {
     // HTTP attempt number lives in job data so rate-limit deferrals (which
     // bump BullMQ's ats but not atm) never inflate it.
     let httpAttempt = job.data.httpAttempt ?? 0;
-    console.log(
-      `[worker] picked job=${job.id} atm=${job.attemptsMade} ats=${job.attemptsStarted} httpAttempt=${httpAttempt}`
-    );
 
     // ---- Rate limit: defer WITHOUT consuming an HTTP attempt ----
     const bucket = this.tokenBucket!;

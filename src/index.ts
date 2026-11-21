@@ -10,6 +10,7 @@ import { DeliveryWorker } from "./worker/delivery";
 import healthRouter from "./routes/health";
 import mockRouter from "./routes/mock";
 import dispatchRouter from "./routes/dispatch";
+import statusRouter from "./routes/status";
 
 async function main(): Promise<void> {
   const app = express();
@@ -17,6 +18,7 @@ async function main(): Promise<void> {
 
   app.use("/", healthRouter); // GET /health
   app.use("/", dispatchRouter); // POST /api/webhooks/dispatch
+  app.use("/", statusRouter); // GET /api/webhooks/:jobId
 
   // Mock receivers exist only in development (spec 4.11).
   if (!env.isProduction) {

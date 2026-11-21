@@ -58,8 +58,10 @@ export interface DeliveryAttemptRow {
 export async function getDeliveryAttempts(jobId: string): Promise<DeliveryAttemptRow[]> {
   const result = await pgPool.query<DeliveryAttemptRow>(
     `
-    SELECT id, job_id, event_id, destination_url, status, response_code,
-           error_details, attempt_count, created_at
+    SELECT id, job_id AS "jobId", event_id AS "eventId",
+           destination_url AS "destinationUrl", status, response_code AS "responseCode",
+           error_details AS "errorDetails", attempt_count AS "attemptCount",
+           created_at AS "createdAt"
     FROM delivery_attempts
     WHERE job_id = $1
     ORDER BY attempt_count ASC, id ASC
