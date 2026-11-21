@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Distributed Webhook Dispatcher</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --ok: #3fb950;
+      --warn: #d29922;
+      --err: #f85149;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px;
+    }
+    .container { max-width: 960px; margin: 0 auto; display: grid; gap: 20px; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+    h1 { margin: 0; font-size: 1.35rem; }
+    h2 { margin: 0 0 12px; font-size: 1rem; color: var(--text); }
+    .subtitle { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: #0d1117;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .ok .dot { background: var(--ok); }
+    .warn .dot { background: var(--warn); }
+    .err .dot { background: var(--err); }
+    .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    button {
+      background: #21262d;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 12px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); }
+    button.primary { background: #1f6feb; border-color: #1f6feb; font-weight: 600; }
+    button.primary:hover { background: #388bfd; }
+    .grid { display: grid; gap: 12px; }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+    input, textarea {
+      width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.85rem;
+    }
+    textarea { min-height: 76px; resize: vertical; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.84rem; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; }
+    .pill {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .pill-success, .pill-completed { background: rgba(63, 185, 80, 0.15); color: var(--ok); }
+    .pill-retrying, .pill-queued, .pill-active, .pill-delayed { background: rgba(210, 153, 34, 0.15); color: var(--warn); }
+    .pill-failed, .pill-dlq { background: rgba(248, 81, 73, 0.15); color: var(--err); }
+    .recent-jobs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .job-chip { font-size: 0.78rem; padding: 4px 8px; }
+    .status-msg { margin-top: 10px; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Distributed Webhook Dispatcher</h1>
+        <div class="subtitle">Express · BullMQ · Redis Token Bucket · PostgreSQL Audit Logs</div>
+      </div>
+      <div class="row">
+        <span id="healthBadge" class="badge"><span class="dot"></span>Checking /health...</span>
+        <button type="button" onclick="checkHealth()">Refresh</button>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>1. Dispatch Webhook</h2>
+      <div class="presets">
+        <button type="button" onclick="applyPreset('200')">200 OK</button>
+        <button type="button" onclick="applyPreset('500')">500 Retry (2s/4s/8s)</button>
+        <button type="button" onclick="applyPreset('429')">429 Rate-Limit Retry</button>
+        <button type="button" onclick="applyPreset('404')">404 Fail-Fast → DLQ</button>
+        <button type="button" onclick="applyPreset('delay')">10s Timeout (5s limit)</button>
+        <button type="button" onclick="runBurst()">8x Rate-Limit Burst</button>
+      </div>
+
+      <form id="dispatchForm" class="grid">
+        <div>
+          <label for="destinationUrl">Destination URL</label>
+          <input id="destinationUrl" type="url" required value="https://httpbin.org/status/200" />
+        </div>
+        <div>
+          <label for="eventId">Event ID</label>
+          <input id="eventId" type="text" required value="evt-demo-1" />
+        </div>
+        <div>
+          <label for="payload">Payload (JSON)</label>
+          <textarea id="payload">{"event":"user.signup","userId":"usr_999"}</textarea>
+        </div>
+        <div class="row">
+          <button type="submit" class="primary">POST /api/webhooks/dispatch</button>
+          <span id="dispatchStatus" class="muted"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>2. Live Job Inspector</h2>
+      <div class="row">
+        <input id="jobIdInput" type="text" placeholder="Paste jobId (e.g. job_...)" style="flex:1; min-width:220px;" />
+        <button type="button" onclick="inspectJob(document.getElementById('jobIdInput').value.trim())">Inspect</button>
+        <button type="button" onclick="stopPolling()">Stop Polling</button>
+      </div>
+      <div id="recentJobs" class="recent-jobs"></div>
+      <div id="inspectorOutput" class="status-msg muted">Dispatch a webhook or paste a jobId to watch live delivery attempts.</div>
+    </section>
+  </div>
+
+  <script>
+    let pollTimer = null;
+    const recent = [];
+
+    async function checkHealth() {
+      const badge = document.getElementById("healthBadge");
+      badge.className = "badge";
+      badge.innerHTML = '<span class="dot"></span>Checking /health...';
+      try {
+        const res = await fetch("/health");
+        const data = await res.json();
+        if (res.ok) {
+          badge.className = "badge ok";
+          badge.innerHTML = `<span class="dot"></span>Healthy (PG & Redis OK)`;
+        } else {
+          badge.className = "badge err";
+          badge.innerHTML = `<span class="dot"></span>Degraded (${res.status})`;
+        }
+      } catch {
+        badge.className = "badge err";
+        badge.innerHTML = '<span class="dot"></span>Unreachable';
+      }
+    }
+
+    function applyPreset(type) {
+      const urlEl = document.getElementById("destinationUrl");
+      const eventEl = document.getElementById("eventId");
+      const payloadEl = document.getElementById("payload");
+      const ts = Date.now().toString().slice(-4);
+      const map = {
+        "200": ["https://httpbin.org/status/200", `demo-200-${ts}`, { test: "ok" }],
+        "500": ["https://httpbin.org/status/500", `demo-500-${ts}`, { test: "retry-500" }],
+        "429": ["https://httpbin.org/status/429", `demo-429-${ts}`, { test: "retry-429" }],
+        "404": ["https://httpbin.org/status/404", `demo-404-${ts}`, { test: "fail-fast" }],
+        "delay": ["https://httpbin.org/delay/10", `demo-timeout-${ts}`, { test: "timeout-5s" }],
+      };
+      const [url, evt, payload] = map[type];
+      urlEl.value = url;
+      eventEl.value = evt;
+      payloadEl.value = JSON.stringify(payload, null, 2);
+    }
+
+    function addRecentJob(jobId, label) {
+      if (!jobId) return;
+      recent.unshift({ jobId, label });
+      if (recent.length > 8) recent.pop();
+      const container = document.getElementById("recentJobs");
+      container.innerHTML = recent.map(j =>
+        `<button type="button" class="job-chip mono" onclick="inspectJob('${j.jobId}')">${j.label}: ${j.jobId.slice(0, 12)}…</button>`
+      ).join("");
+    }
+
+    async function dispatchOne(destinationUrl, eventId, payload) {
+      const t0 = performance.now();
+      const res = await fetch("/api/webhooks/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ destinationUrl, eventId, payload }),
+      });
+      const ms = Math.round(performance.now() - t0);
+      const data = await res.json();
+      return { res, data, ms };
+    }
+
+    document.getElementById("dispatchForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const statusEl = document.getElementById("dispatchStatus");
+      let payload;
+      try {
+        payload = JSON.parse(document.getElementById("payload").value);
+      } catch {
+        statusEl.textContent = "Invalid JSON payload.";
+        return;
+      }
+      const url = document.getElementById("destinationUrl").value.trim();
+      const eventId = document.getElementById("eventId").value.trim();
+      statusEl.textContent = "Dispatching...";
+      try {
+        const { res, data, ms } = await dispatchOne(url, eventId, payload);
+        if (res.status === 202 && data.jobId) {
+          statusEl.textContent = `202 Accepted in ${ms}ms → ${data.jobId}`;
+          addRecentJob(data.jobId, eventId);
+          inspectJob(data.jobId);
+        } else {
+          statusEl.textContent = `Error ${res.status}: ${JSON.stringify(data)}`;
+        }
+      } catch (err) {
+        statusEl.textContent = `Request failed: ${err.message}`;
+      }
+    });
+
+    async function runBurst() {
+      const statusEl = document.getElementById("dispatchStatus");
+      statusEl.textContent = "Firing 8 rapid requests to httpbin.org/status/200...";
+      const ts = Date.now().toString().slice(-4);
+      const reqs = Array.from({ length: 8 }, (_, i) =>
+        dispatchOne("https://httpbin.org/status/200", `burst-${ts}-${i + 1}`, { burstIndex: i + 1 })
+      );
+      const results = await Promise.all(reqs);
+      let lastJobId = null;
+      results.forEach((r, idx) => {
+        if (r.data && r.data.jobId) {
+          addRecentJob(r.data.jobId, `burst-${idx + 1}`);
+          lastJobId = r.data.jobId;
+        }
+      });
+      statusEl.textContent = `Queued 8 jobs. Inspecting burst-8 to show token-bucket pacing.`;
+      if (lastJobId) inspectJob(lastJobId);
+    }
+
+    function stopPolling() {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    }
+
+    async function inspectJob(jobId) {
+      if (!jobId) return;
+      stopPolling();
+      document.getElementById("jobIdInput").value = jobId;
+      await fetchAndRenderJob(jobId);
+      pollTimer = setInterval(() => fetchAndRenderJob(jobId), 1500);
+    }
+
+    async function fetchAndRenderJob(jobId) {
+      const out = document.getElementById("inspectorOutput");
+      try {
+        const res = await fetch(`/api/webhooks/${encodeURIComponent(jobId)}`);
+        const data = await res.json();
+        if (!res.ok) {
+          out.innerHTML = `<span style="color:var(--err)">Error ${res.status}: ${data.error || "Not found"}</span>`;
+          stopPolling();
+          return;
+        }
+        const status = data.status || "unknown";
+        const rows = (data.deliveryHistory || []).map(h => `
+          <tr>
+            <td>${h.attemptCount}</td>
+            <td><span class="pill pill-${h.status}">${h.status}</span></td>
+            <td class="mono">${h.responseCode ?? "—"}</td>
+            <td class="mono">${h.errorDetails ?? "—"}</td>
+            <td class="mono">${new Date(h.createdAt).toLocaleTimeString()}</td>
+          </tr>
+        `).join("");
+
+        out.innerHTML = `
+          <div class="row" style="margin-bottom:8px;">
+            <span class="pill pill-${status}">${status}</span>
+            <span class="mono">${data.jobId}</span>
+            <span class="muted">Attempts: <strong>${data.httpAttemptCount ?? 0}</strong></span>
+          </div>
+          <div class="muted mono" style="margin-bottom:8px;">${data.destinationUrl || ""}</div>
+          ${rows ? `
+            <table>
+              <thead><tr><th>#</th><th>Status</th><th>HTTP</th><th>Error</th><th>Time</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          ` : `<div class="muted">Waiting for worker to record first attempt...</div>`}
+        `;
+
+        if (status === "completed" || status === "dlq") {
+          stopPolling();
+        }
+      } catch (err) {
+        out.innerHTML = `<span style="color:var(--err)">Polling error: ${err.message}</span>`;
+        stopPolling();
+      }
+    }
+
+    checkHealth();
+  </script>
+</body>
+</html>

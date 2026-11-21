@@ -1,4 +1,5 @@
 import express from "express";
+import path from "path";
 import type { NextFunction, Request, Response } from "express";
 import { env } from "./config/env";
 import { runMigrations } from "./db/migrate";
@@ -24,6 +25,7 @@ async function main(): Promise<void> {
   if (!env.isProduction) {
     app.use("/mock", mockRouter);
   }
+  app.use(express.static(path.resolve(process.cwd(), "public")));
 
   app.use((_req, res) => {
     res.status(404).json({ error: "not found" });
