@@ -4,19 +4,23 @@
 Node.js and TypeScript webhook ingestion and delivery engine using Express, BullMQ, Redis, and PostgreSQL.
 
 ## Live Deployment
-- **Base URL:** `[https://webhook-dispatcher-ip95.onrender.com](https://webhook-dispatcher-ip95.onrender.com)`
-- **Health Check:** `GET [https://webhook-dispatcher-ip95.onrender.com/health](https://webhook-dispatcher-ip95.onrender.com/health)`
+- **Base URL:** https://webhook-dispatcher-ip95.onrender.com
+- **Health Check:** `GET` https://webhook-dispatcher-ip95.onrender.com/health
 
-> **Note:** Hosted on Render's free tier; the first request after inactivity may take ~50 seconds to wake up. Mock receiver routes (`/mock/*`) are intentionally disabled in production (`NODE_ENV=production`)—use external endpoints such as `[https://httpbin.org/status/200](https://httpbin.org/status/200)` (or `/500`, `/404`) when testing against the live URL.
+> **Note:** Hosted on Render's free tier; the first request after inactivity may take ~50 seconds to wake up. Mock receiver routes (`/mock/*`) are intentionally disabled in production (`NODE_ENV=production`)—use external endpoints such as `https://httpbin.org/status/200` (or `/500`, `/404`) when testing against the live URL.
 
 **Quick Live Test:**
 ```bash
-curl -X POST https://webhook-dispatcher-ip95.onrender.com/api/webhooks/dispatch \
+curl -X POST [https://webhook-dispatcher-ip95.onrender.com/api/webhooks/dispatch](https://webhook-dispatcher-ip95.onrender.com/api/webhooks/dispatch) \
   -H "Content-Type: application/json" \
-  -d '{"destinationUrl":"https://httpbin.org/status/200","eventId":"live-test-1","payload":{"msg":"hello"}}'
+  -d '{"destinationUrl":"[https://httpbin.org/status/200](https://httpbin.org/status/200)","eventId":"live-test-1","payload":{"msg":"hello"}}'
+```
 
-## 2. Architecture
-The API validates and enqueues work, a BullMQ worker performs outbound HTTP delivery, PostgreSQL stores attempt history, and permanently failed jobs are copied to a separate DLQ.
+## 2. Architecture & Design Choices
+- **Non-Blocking Ingestion & Background Execution (Express + BullMQ/Redis):** `POST /api/webhooks/dispatch` only validates the payload and enqueues a job into Redis via BullMQ, returning `202 Accepted` immediately regardless of downstream latency. On Render's free tier, the API and BullMQ worker run in a single Node.js process to fit the single-service constraint while preserving async decoupling.
+- **State Persistence (Redis + PostgreSQL):** Redis handles fast, atomic queue state and rate-limiting counters, while PostgreSQL (`delivery_attempts`) stores durable, queryable delivery audit logs (`retrying`, `success`, `failed`, HTTP status codes, attempt counts, and timestamps).
+- **Rate Limiting (Atomic Redis Lua Token Bucket):** Chosen over a sliding window because it supports controlled bursts (5-token capacity, 1 token/sec refill per destination hostname) in $O(1)$ memory and prevents race conditions via atomic Lua execution. Deferred jobs do not consume HTTP retry attempts.
+- **Error Handling & DLQ:** Retryable failures (`5xx`, `429`, and 5s timeouts) retry up to 3 times with exponential backoff (2s, 4s, 8s). Non-retryable `4xx` errors (such as `404`) fail fast on attempt 1. All terminal failures are copied to `webhook-dlq` for inspection.
 
 ## 3. Prerequisites
 - Node.js 20+
@@ -64,7 +68,7 @@ Copy `.env.example` to `.env` for local defaults.
 ## 8. Dispatch Request
 ```json
 {
-  "destinationUrl": "http://127.0.0.1:3000/mock/200",
+  "destinationUrl": "[http://127.0.0.1:3000/mock/200](http://127.0.0.1:3000/mock/200)",
   "eventId": "event-123",
   "payload": { "customerId": "c-1" }
 }
@@ -116,25 +120,3 @@ The Vitest suite covers dispatch validation and 202/503 behavior, unique IDs and
 
 ## 19. Postman
 Import `postman.collection.json`, set `baseUrl`, then run the health, dispatch, status, and mock scenarios. Copy the returned `jobId` into the collection's `jobId` variable.
-
-## 20. Manual GitHub and Render Deployment Checklist
-
-### GitHub
-- [ ] Create a GitHub repository.
-- [ ] Verify `.env` is ignored.
-- [ ] Verify `node_modules`, `dist`, coverage, and local logs are ignored.
-- [ ] Run `git grep -n` for passwords, tokens, and private URLs.
-- [ ] Commit all source and handoff files.
-- [ ] Push manually to the chosen branch.
-
-### Render
-- [ ] Provision managed Redis.
-- [ ] Provision managed PostgreSQL.
-- [ ] Set `NODE_ENV=production`, `PG_CONNECTION_STRING`, and `REDIS_URL`.
-- [ ] Create the Blueprint from `render.yaml`.
-- [ ] Confirm the service plan and region.
-- [ ] Confirm migrations complete during startup or run the migration path externally.
-- [ ] Verify `/health` returns 200.
-- [ ] Send a public destination that is allowed by production SSRF policy.
-- [ ] Test status, retry, timeout, 404, and DLQ behavior.
-- [ ] Re-review free-tier sleep and Redis/PostgreSQL retention limitations.
