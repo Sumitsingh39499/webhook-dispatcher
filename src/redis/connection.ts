@@ -39,10 +39,35 @@ export function getSharedRedis(): Redis {
 /** Connectivity probe used by /health and startup checks. */
 export async function checkRedis(timeoutMs = 2000): Promise<void> {
   const client = getSharedRedis();
+
   if (client.status !== "ready") {
-    // Do not wait for the auto-retry loop; fail the health check immediately.
-    throw new Error(`Redis not ready (status=${client.status})`);
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error(`Redis not ready (status=${client.status})`));
+      }, timeoutMs);
+
+      const onReady = () => {
+        cleanup();
+        resolve();
+      };
+
+      const onError = (err: Error) => {
+        cleanup();
+        reject(new Error(`Redis connection error: ${err.message}`));
+      };
+
+      const cleanup = () => {
+        clearTimeout(timer);
+        client.off("ready", onReady);
+        client.off("error", onError);
+      };
+
+      client.once("ready", onReady);
+      client.once("error", onError);
+    });
   }
+
   const pong = await client.ping();
   if (pong !== "PONG") {
     throw new Error(`Redis PING returned unexpected value: ${pong}`);
